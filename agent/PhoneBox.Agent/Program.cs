@@ -39,6 +39,9 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 builder.WebHost.ConfigureKestrel(k =>
 {
+    // a dictation travels in the query (the phone's transport sends no request bodies): 1000 characters of any script,
+    // percent-encoded, fit in 16 KB
+    k.Limits.MaxRequestLineSize = 16 * 1024;
     k.Listen(IPAddress.Loopback, Port);
     // Wi-Fi / Tailscale: HTTPS with a pinned self-signed certificate, token required (see Lan.cs).
     if (lanCert is not null) k.Listen(IPAddress.Any, lanCfg.Port, l => l.UseHttps(lanCert));
@@ -62,6 +65,7 @@ builder.Services.AddSingleton<CommandRunner>();
 builder.Services.AddSingleton<ApprovalStore>();
 builder.Services.AddSingleton<HomeAssistant>();
 builder.Services.AddSingleton<AppConsole>();
+builder.Services.AddSingleton<Dictation>();
 AddMonitor<SystemMonitor>(builder.Services);
 AddMonitor<MediaMonitor>(builder.Services);
 AddMonitor<QuotaMonitor>(builder.Services);
@@ -484,9 +488,21 @@ app.MapGet("/api/ha/states", async (string? ids, HomeAssistant ha) =>
     Results.Json(await ha.StatesAsync((ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))));
 app.MapPost("/api/ha/toggle/{id}", async (string id, HomeAssistant ha) =>
     await ha.ToggleAsync(id) is { } error ? Results.BadRequest(new { error }) : Results.Ok(new { ok = true }));
+// Settings › General › Ping & network: the connected adapters to pick from (local only, not on the Wi-Fi list)
+app.MapGet("/api/network/adapters", (ConfigStore cfg) => Results.Json(SystemMonitor.Adapters(cfg.Get().Ping.Adapters)));
+
 // Settings › General › Home Assistant › Test (local only)
 app.MapPost("/api/ha/test", async (HomeAssistantConfig body) =>
     Results.Json(new { result = await HomeAssistant.TestAsync(body.Url ?? "", body.Token ?? "") }));
+
+// Dictation (widget): text the phone recognized, typed into the app in front (only if that widget allows it).
+// The text is in the query: the phone's WebView sees no request bodies, so its transport (USB and Wi-Fi) sends POSTs
+// without one, like every other panel request. Kestrel's request line (16 KB) bounds it; request URLs aren't logged.
+app.MapPost("/api/dictate", async (string? widget, string? text, HttpRequest req, Dictation dictation, CancellationToken ct) =>
+{
+    var (status, error) = await dictation.TypeAsync(req.Headers["X-PhoneBox-Device"].ToString(), widget, text, ct);
+    return error is null ? Results.Ok(new { ok = true }) : Results.Json(new { error }, statusCode: status);
+});
 
 // App console (widget): the focused app's profile (labels only) and its keys, by profile id and slot.
 app.MapGet("/api/console", (string? widget, HttpRequest req, AppConsole console) =>
@@ -741,7 +757,10 @@ app.Run();
 single.ReleaseMutex();
 single.Dispose();
 if (AppRestart.Requested && Environment.ProcessPath is { } exe)
-    System.Diagnostics.Process.Start(AppRestart.StartInfo(exe, args));
+{
+    if (AppRestart.ServiceManaged(Environment.GetEnvironmentVariable, Environment.ProcessId, AppRestart.ParentName)) Environment.ExitCode = AppRestart.ServiceRestartCode;
+    else System.Diagnostics.Process.Start(AppRestart.StartInfo(exe, args));
+}
 
 static void AddMonitor<T>(IServiceCollection s) where T : class, IHostedService
 {
@@ -751,3 +770,4 @@ static void AddMonitor<T>(IServiceCollection s) where T : class, IHostedService
 
 /// <summary>Body of POST /api/pair/claim.</summary>
 internal sealed record PairClaim(string? Code);
+

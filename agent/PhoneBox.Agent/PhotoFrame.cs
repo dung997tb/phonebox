@@ -289,10 +289,14 @@ public sealed class PhotoFrame(ConfigStore config, ILogger<PhotoFrame> log)
     /// <summary>After a scan: scaled copies of photos that are gone, changed or in another folder are deleted.</summary>
     private void CleanCache(Library lib)
     {
-        if (!Directory.Exists(CacheDir)) return;
         var keep = lib.Photos.Select(p => CacheKey(p) + ".jpg").ToHashSet(StringComparer.Ordinal);
-        foreach (var f in Directory.EnumerateFiles(CacheDir))
-            if (!keep.Contains(System.IO.Path.GetFileName(f))) try { File.Delete(f); } catch (IOException) { }
+        // under the lock WriteCache publishes with: a copy being written (its .tmp file) is never pulled away mid-move
+        lock (_gate)
+        {
+            if (!Directory.Exists(CacheDir)) return;
+            foreach (var f in Directory.EnumerateFiles(CacheDir))
+                if (!keep.Contains(System.IO.Path.GetFileName(f))) try { File.Delete(f); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>No folder any more: no scaled copies of its photos either.</summary>

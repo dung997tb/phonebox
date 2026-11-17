@@ -180,6 +180,19 @@ public class LanTests
         Assert.False(Lan.MatchesQuery("", "abc123"));
         Assert.False(Lan.MatchesQuery(null, "abc123"));
     }
+
+    [Theory]
+    // A Hyper-V external switch owns the physical NIC's address and gateway: skipping it emptied
+    // the pairing QR's host list (#175). Host-only and NAT virtual adapters have no gateway.
+    [InlineData("Hyper-V Virtual Ethernet Adapter vEthernet (WAN)", true, false)]
+    [InlineData("Hyper-V Virtual Ethernet Adapter vEthernet (Default Switch)", false, true)]
+    [InlineData("WSL adapter vEthernet (WSL)", false, true)]
+    [InlineData("VMware Virtual Ethernet Adapter VMnet8", false, true)]
+    [InlineData("Bluetooth Device (Personal Area Network)", false, true)]
+    [InlineData("Intel(R) Ethernet Controller I219-LM Ethernet", false, false)]
+    [InlineData("Intel(R) Ethernet Controller I219-LM Ethernet", true, false)]
+    public void VirtualAdaptersAreSkippedUnlessTheyCarryTheDefaultRoute(string desc, bool hasGateway, bool skip) =>
+        Assert.Equal(skip, Lan.ShouldSkipAdapter(desc, hasGateway));
 }
 
 public class PushTests

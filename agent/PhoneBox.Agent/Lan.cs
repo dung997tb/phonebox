@@ -47,10 +47,10 @@ public static class Lan
             if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
             var desc = ni.Description + " " + ni.Name;
             var isTailscale = desc.Contains("Tailscale", StringComparison.OrdinalIgnoreCase);
-            if (!isTailscale && (desc.Contains("Virtual", StringComparison.OrdinalIgnoreCase) || desc.Contains("vEthernet", StringComparison.OrdinalIgnoreCase)
-                || desc.Contains("Hyper-V", StringComparison.OrdinalIgnoreCase) || desc.Contains("WSL", StringComparison.OrdinalIgnoreCase)
-                || desc.Contains("VMware", StringComparison.OrdinalIgnoreCase) || desc.Contains("Bluetooth", StringComparison.OrdinalIgnoreCase))) continue;
-            foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+            var props = ni.GetIPProperties();
+            var hasGateway = props.GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork);
+            if (!isTailscale && ShouldSkipAdapter(desc, hasGateway)) continue;
+            foreach (var ua in props.UnicastAddresses)
             {
                 if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue;
                 var b = ua.Address.GetAddressBytes();
@@ -60,6 +60,17 @@ public static class Lan
         }
         return lan.Concat(tailscale).Distinct().ToList();
     }
+
+    /// <summary>
+    /// Virtual adapters (Hyper-V, WSL, VMware, Bluetooth PAN) are skipped unless one owns an IPv4 default
+    /// gateway: a Hyper-V external switch takes over the physical NIC's address and route, so dropping it
+    /// would leave the pairing link with no usable host. Host-only and NAT virtual adapters have no
+    /// gateway, so they are skipped as before.
+    /// </summary>
+    internal static bool ShouldSkipAdapter(string desc, bool hasIpv4Gateway) =>
+        !hasIpv4Gateway && (desc.Contains("Virtual", StringComparison.OrdinalIgnoreCase) || desc.Contains("vEthernet", StringComparison.OrdinalIgnoreCase)
+            || desc.Contains("Hyper-V", StringComparison.OrdinalIgnoreCase) || desc.Contains("WSL", StringComparison.OrdinalIgnoreCase)
+            || desc.Contains("VMware", StringComparison.OrdinalIgnoreCase) || desc.Contains("Bluetooth", StringComparison.OrdinalIgnoreCase));
 
     public static bool Matches(string? header, string token)
     {
@@ -80,7 +91,7 @@ public static class Lan
         || path.StartsWithSegments("/api/state") || path.StartsWithSegments("/api/config") || path.StartsWithSegments("/api/art")
         || path.StartsWithSegments("/api/media") || path.StartsWithSegments("/api/volume") || path.StartsWithSegments("/api/quotas")
         || path.StartsWithSegments("/api/work") || path.StartsWithSegments("/api/procs") || path.StartsWithSegments("/api/run")
-        || path.StartsWithSegments("/api/apps") || path.StartsWithSegments("/api/console")
+        || path.StartsWithSegments("/api/apps") || path.StartsWithSegments("/api/console") || path == "/api/dictate"
         || path.StartsWithSegments("/api/widget") || path.StartsWithSegments("/api/calendar") || path.StartsWithSegments("/api/feeds") || path.StartsWithSegments("/api/photos") || path.StartsWithSegments("/api/docker") || path.StartsWithSegments("/api/obs") || path.StartsWithSegments("/api/discord") || path.StartsWithSegments("/api/batteries") || path.StartsWithSegments("/api/ha/states") || path.StartsWithSegments("/api/ha/toggle") || path.StartsWithSegments("/api/approvals") || path.StartsWithSegments("/api/rules/pause") || path.StartsWithSegments("/api/phone/battery") || path.StartsWithSegments("/api/stream") || path == "/api/pair/claim" || IsWebhook(path);
 
     /// <summary>

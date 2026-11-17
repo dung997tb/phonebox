@@ -19,8 +19,8 @@ Last updated: 2026-11-15 (PhoneBox 0.9.6).
   itself), so a restart doesn't ask Anthropic again sooner than it should.
 - **Log**: `agent.log` in `%LOCALAPPDATA%\PhoneBox` (Windows), `~/.local/share/PhoneBox` (Linux) or
   `~/Library/Application Support/PhoneBox` (macOS).
-- **Phone app**: caches (weather, rates, widget state) in its own app storage. The app asks for two permissions only:
-  `INTERNET` and `VIBRATE`.
+- **Phone app**: caches (weather, rates, widget state) in its own app storage. The app asks for `INTERNET` and
+  `VIBRATE`, and for the microphone (`RECORD_AUDIO`) only when a Dictation widget's button is tapped for the first time.
 - **Computer data shown on the panel** (CPU, GPU, memory, disks, processes, media, volume, AI coding sessions and
   quotas, Docker / Podman, OBS) is read locally and goes only to your phone: over the USB cable (`adb reverse` to
   `127.0.0.1`) or, after pairing, over Wi-Fi / Tailscale with a pinned certificate and a key.
@@ -51,7 +51,7 @@ identifies your GitHub account to GitHub.
 | Feature | Where | What is sent |
 |---|---|---|
 | Discord widget | `discord.com/api/oauth2/token`, once at login and when the token needs renewing; `cdn.discordapp.com`, once per server icon and avatar shown (the agent fetches them, the phone never contacts Discord; the rest goes through the Discord app on this PC, locally). Turn off in **Settings › General › Discord** | The application's client ID and secret, and the one-time login code or the saved refresh token; for images only the image's id and hash, which Discord already knows |
-| Claude quota | `api.anthropic.com/api/oauth/usage` | The OAuth token Claude Code stores in `~/.claude/.credentials.json`, read-only; PhoneBox never refreshes it |
+| Claude quota | `api.anthropic.com/api/oauth/usage` | The OAuth token Claude Code stores in `~/.claude/.credentials.json`, or on macOS, when that file doesn't exist, the "Claude Code-credentials" item from the default keychain search list (normally the login Keychain), read with `security find-generic-password`; read-only, PhoneBox never refreshes it |
 | GitHub widget | `api.github.com`, through your own GitHub CLI (`gh`) | Whatever `gh` sends with its own sign-in |
 | Hacker News widget (phone) | `hacker-news.firebaseio.com` | Nothing but the request |
 | Exchange rates widget (phone) | `api.frankfurter.dev` | The currencies you chose |
@@ -61,6 +61,7 @@ identifies your GitHub account to GitHub.
 | Spotify queue covers (phone) | `i.scdn.co`, while a Spotify queue widget shows covers. Turn off with the widget's **Show covers** option | The request for each cover image |
 | Pairing over Wi-Fi without USB | `ersinkoc.github.io` (the page the QR code opens), then your computer | GitHub Pages serves the page and sees your IP address; the pairing details are after `#` in the link, which browsers never send, and the page removes them from the history. The phone then sends the one-time code only to your computer, over TLS pinned to its certificate |
 | Calendars | The iCal addresses you add | The request to that address |
+| Dictation widget | Only while you hold a dictation open (the microphone button is red, at most a minute): the phone's own speech recognizer hears you. On most phones that is Google's, which may send the audio to Google. With the widget's **Recognize on the phone only** option the app uses Android's on-device recognizer, which keeps the audio on the phone; that needs Android 12 or later and the offline language, and on older Android the option refuses to listen rather than fall back. The recognized text goes from the phone to the agent and is typed into the app in front if the widget's **Type the text on the computer** option is on (off by default). Neither the audio nor the text is stored or logged by PhoneBox. Android asks for the microphone the first time the button is tapped; you can take it back in Android's app settings | Google (or your phone's recognizer), only while dictating; nothing with on-device recognition |
 | App console widget | Nothing. On Windows the agent reads the process name of the focused window to pick the matching app profile; that name stays on the computer, and the phone only gets the profile's name and key labels (a key without a label shows its keys, such as ctrl+z). With the widget's **Send keys to the computer** option on (off by default), a tap sends the profile's id and the key's slot, and the agent presses the keys only if the app in front still matches that profile | Nothing |
 | News feeds widget | The RSS and Atom addresses you add in **Settings › General**, fetched by the agent at most every 15 minutes and only while a page shows the widget; the phone never contacts the feed sites. With the widget's **Open articles on the PC** option on (off by default), tapping a headline opens its article in the computer's browser. Turn the requests off by removing the feeds in **Settings › General › News feeds**, or the widget from your pages | The request to that address, with the feed's last `ETag` / `Last-Modified` so an unchanged feed is not sent again |
 | Home Assistant | Your Home Assistant server | The access token you enter |

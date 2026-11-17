@@ -13,6 +13,7 @@ import './widgets/web.js';
 import './widgets/photos.js';
 import './widgets/controls.js';
 import './widgets/console.js';
+import './widgets/dictate.js';
 
 // PhoneBox desk panel. Pages are 12 × 6 grids of widgets, designed in the agent's settings page.
 // The panel talks to the PhoneBox agent through "/agent/*", which the Android shell proxies over USB
@@ -32,7 +33,7 @@ export const $ = (id) => document.getElementById(id);
 // The native bridge (window.Android) is in every frame, sandboxed widgets included, so each call carries a key that only
 // the panel's own frames receive (MainActivity.bridgeKey). This wrapper adds it.
 const BRIDGE = ['battery', 'buzz', 'haptic', 'is24Hour', 'pcs', 'selectPc', 'forgetPc', 'setBrightness', 'setHomeScreen', 'setOrientation',
-  'setPinned', 'setVolumeKeys', 'transport', 'sensors', 'version'];
+  'setPinned', 'setVolumeKeys', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening'];
 export const bridge = typeof Android === 'undefined' ? null : Object.fromEntries(BRIDGE.filter((m) => typeof Android[m] === 'function')
   .map((m) => [m, (...args) => Android[m](window.__phoneboxKey || '', ...args)]));
 // Live preview inside the agent's layout editor: the layout comes from the editor (unsaved), not from the agent.
@@ -167,6 +168,7 @@ const ICONS = {
   info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01',
   pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
   play: 'M6 3l14 9-14 9V3z',
+  mic: 'M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8',
 };
 export function icon(name, cls = '') {
   const t = document.createElement('template');
@@ -958,7 +960,7 @@ export function handleEvent(e) {
   else if (e.kind === 'reload') location.reload();
 }
 
-export const WIDGET_ICONS = { 'app-console': '🎛️', discord: '💬', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
+export const WIDGET_ICONS = { dictate: '🎙️', 'app-console': '🎛️', discord: '💬', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
   github: '🐙', processes: '⚙️', shortcuts: '🎛️', button: '🔘', worldclock: '🌍', calendar: '📅', pomodoro: '🍅', countdown: '⏳', note: '📝', command: '💻',
   push: '📡', inbox: '📬', label: '🔤', analog: '🕰️', progress: '📆', stopwatch: '⏱️', timer: '⏲️', counter: '🔢', breathe: '🫁', quote: '💬',
   checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', feeds: '🗞️', photos: '🖼️', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️' };
@@ -1743,6 +1745,7 @@ export function tick() {
     else { navQueue.push({ kind: 'home', at: Date.now(), priority: -1 }); pump(); }
   }
   applyBurnIn();
+  document.body.classList.toggle('controls-top', cfg.display?.controlsTop === true);
   if (!nightOn) emit('tick');
   setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
 }

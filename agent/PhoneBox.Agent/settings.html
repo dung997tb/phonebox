@@ -416,6 +416,9 @@ dd { margin: 0; word-break: break-all; }
         <h3 data-i18n="s.ping.title">Ping</h3>
         <div class="field"><label data-i18n="s.ping.label">Host pinged every 5 seconds for the ping metric and the "ping high" rule (empty = off)</label>
           <input type="text" data-bind="ping.host" placeholder="off" spellcheck="false" autocomplete="off"></div>
+        <div class="field" style="margin-top:10px"><label data-i18n="s.net.adapters">Network adapters counted by the network meters</label>
+          <div id="netAdapters" class="hint"></div>
+          <span class="hint" data-i18n="s.net.hint">None ticked = automatic (the connected Ethernet and Wi-Fi adapters). With a VPN that carries the same traffic, or a reading that looks too high, tick only the adapter you use.</span></div>
       </div>
 
       <div class="card">
@@ -515,6 +518,7 @@ dd { margin: 0; word-break: break-all; }
         <label class="check"><input type="checkbox" data-bind="display.autoBrightness"> <span data-i18n="s.display.autoBrightness">Brightness follows the room (light sensor)</span></label>
         <label class="check"><input type="checkbox" data-bind="display.nightWhenDark"> <span data-i18n="s.display.nightWhenDark">Show the night screen whenever the room is dark</span></label>
         <label class="check"><input type="checkbox" data-bind="display.proximityWake"> <span data-i18n="s.display.proximityWake">A hand near the phone wakes the night screen</span></label>
+        <label class="check"><input type="checkbox" data-bind="display.controlsTop"> <span data-i18n="s.display.controlsTop">Page dots and the Allow / Deny buttons at the top of the screen</span></label>
       </div>
 
       <div class="card">
@@ -1727,6 +1731,24 @@ $('consoleAdd').onclick = () => {
   cfg.console.profiles.push({ label: '', apps: '', keys: [] });
   renderConsole(); changed();
 };
+// ---------------------------------------------------------------- network adapters (Settings › General › Ping)
+async function renderNetAdapters() {
+  cfg.ping ??= {};
+  cfg.ping.adapters ??= [];
+  let list = [];
+  try { list = await (await fetch('/api/network/adapters')).json(); } catch (_) {}
+  // a chosen adapter that isn't connected now stays in the list, so it isn't dropped by the next save
+  for (const name of cfg.ping.adapters) if (!list.some((a) => a.name.toLowerCase() === name.toLowerCase())) list.push({ name, description: '', auto: false });
+  $('netAdapters').replaceChildren(...list.map((a) => h('label', { class: 'check' },
+    h('input', { type: 'checkbox', checked: cfg.ping.adapters.some((n) => n.toLowerCase() === a.name.toLowerCase()),
+      onchange: (e) => {
+        const rest = cfg.ping.adapters.filter((n) => n.toLowerCase() !== a.name.toLowerCase());
+        cfg.ping.adapters = e.target.checked ? [...rest, a.name] : rest;
+        changed();
+      } }),
+    ' ', h('span', {}, a.name), a.description ? h('small', { style: 'color:var(--muted)' }, ' · ' + a.description) : '',
+    a.auto ? h('small', { style: 'color:var(--muted)' }, ' · ' + t('s.net.auto')) : '')));
+}
 // ---------------------------------------------------------------- news feeds
 function renderFeeds() {
   cfg.feeds ??= [];
@@ -2609,7 +2631,7 @@ async function load() {
   cfg = await res.json();
   fillDefaults();
   saved = JSON.stringify(cfg);
-  renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderConsole(); renderCharge(); bindForm(); changed(); loadInfo(); loadPhones();
+  renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderConsole(); renderNetAdapters(); renderCharge(); bindForm(); changed(); loadInfo(); loadPhones();
 }
 
 async function save() {
@@ -2624,7 +2646,7 @@ async function save() {
 }
 
 $('save').onclick = save;
-$('revert').onclick = () => { cfg = JSON.parse(saved); renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderConsole(); renderPhones(); renderCharge(); bindForm(); changed(); };
+$('revert').onclick = () => { cfg = JSON.parse(saved); renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderConsole(); renderNetAdapters(); renderPhones(); renderCharge(); bindForm(); changed(); };
 // Over USB this also wakes the phone and brings the panel to the front (adb); over Wi-Fi the phone switches to the
 // page selected in the editor through the live stream.
 $('openPhone').onclick = async () => {
@@ -2709,7 +2731,7 @@ $('applyJson').onclick = () => {
     cfg = c;
     fillDefaults();
     $('jsonErr').textContent = '';
-    renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderConsole(); renderPhones(); renderCharge(); bindForm(); changed(); toast(t('s.jsonLoaded'));
+    renderPages(); renderDeck(); renderRules(); renderCalendars(); renderFeeds(); renderConsole(); renderNetAdapters(); renderPhones(); renderCharge(); bindForm(); changed(); toast(t('s.jsonLoaded'));
   }
   catch (e) { $('jsonErr').textContent = e.message; }
 };

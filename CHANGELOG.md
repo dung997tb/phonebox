@@ -3,6 +3,14 @@
 ## Unreleased
 
 **New widget**
+- **Dictation**: tap the microphone and speak, and the text is typed into the app in front on the PC. The phone's own
+  speech recognizer does the listening (on most phones Google's, which may use its servers; the widget's "Recognize on
+  the phone only" option uses Android 12's on-device recognizer, which keeps the audio on the phone, and refuses on
+  older Android instead of falling back). The app asks for the
+  microphone the first time the button is tapped, listens for at most a minute and never while the widget is out of
+  sight. The agent types only for a widget whose "Type the text on the computer" option is on, turns line breaks into
+  spaces so nothing is sent or run by accident, and presses Enter only with the widget's "Press Enter after the text"
+  option. Windows, macOS and Linux (xdotool or wtype). Idea and first version in #51 by [blx10](https://github.com/blx10).
 - **Photo frame**: a slideshow of the photos in a folder on the PC; a synced OneDrive, Dropbox or iCloud folder works too
   (photos only in the cloud are skipped). Choose the folder in Settings › General. On Windows and macOS the agent
   scales large JPEG and PNG photos down before they go to the phone; other photos go as they are up to 6 MB, and
@@ -18,6 +26,18 @@
   version in #48 by [blx10](https://github.com/blx10).
 
 **Agent**
+- Wi-Fi pairing: on a PC whose network goes through a Hyper-V external switch, the pairing link carries the PC's
+  address again instead of an empty host list (#175, #176, [Seyamalam](https://github.com/Seyamalam)).
+- Windows: no "adb.exe - Application Error (0xc0000142)" box at shutdown. The agent no longer starts adb once
+  Windows is ending the session (#179, [bakhus99](https://github.com/bakhus99)).
+- macOS and Linux: Restart and a self-update bring the agent back when it runs as the setup.sh login item (launchd)
+  or a systemd service. It now leaves the restart to the service manager instead of starting a copy that launchd
+  stopped with it (#182, [shobhit-lyzr](https://github.com/shobhit-lyzr)).
+- PRIVACY.md: on macOS the Claude quota reads the token from the Keychain (the default search list, normally the login Keychain) when
+  `~/.claude/.credentials.json` doesn't exist (#183, [shobhit-lyzr](https://github.com/shobhit-lyzr)).
+- Settings › General › Ping: choose which network adapters the network meters count. With a VPN that tunnels the same
+  traffic, or a driver that reports it twice, the meters showed double; tick only the adapter you use (#190,
+  [h2r2me453](https://github.com/h2r2me453); also a way around #169). None ticked keeps the automatic choice.
 - Windows: the CPU temperature also works on older Intel processors that LibreHardwareMonitor reports only per core
   ("CPU Core #1"…): the hottest core of the CPU is shown when there is no package reading (idea and first version in
   #164, [anandyakshit](https://github.com/anandyakshit)).
@@ -25,7 +45,15 @@
   Razer Synapse (#158, [MarsOldboy](https://github.com/MarsOldboy)). Only known Razer products are asked, only for
   the battery and charging state, and the BlackShark V2 Pro headset only while Synapse isn't running.
 
+**Android app**
+- A Quick Settings tile: add PhoneBox in the phone's Edit tiles, and a tap brings the panel to the front (#180,
+  [arrowssuhail-oss](https://github.com/arrowssuhail-oss)).
+- Wi-Fi pairing page: on Android, when "Open in PhoneBox" opens a store instead of the app (some browsers do that,
+  common on LineageOS), a second link opens the pairing link directly (#175, [hassanxs](https://github.com/hassanxs)).
+
 **Panel**
+- Settings › Display › "Page dots and the Allow / Deny buttons at the top of the screen", for a panel that stands below
+  the screen, where the bottom edge is hard to reach (#181, [Muhammadrizo04](https://github.com/Muhammadrizo04)).
 - Smart Stack: a rotation interval of 0 turns automatic rotation off, so the stack changes only when you swipe or tap
   a dot; the longest interval is now 10 minutes (#171, [MrKatsuragi](https://github.com/MrKatsuragi)).
 - The Spotify queue widget shows what is playing now and what comes next, with covers; tap a track to play it. Covers

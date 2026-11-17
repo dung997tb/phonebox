@@ -71,11 +71,7 @@ public sealed class AppConsole(ConfigStore config, ILogger<AppConsole> log)
     /// The app console widget the phone names, as "pageId/widgetId" ("pageId/stackId:cardId" in a Smart Stack), if it is
     /// on an enabled page this phone shows. Each widget's own "control" option counts, not another one's.
     /// </summary>
-    public static WidgetConfig? WidgetFor(AgentConfig c, string? deviceId, string? key) => string.IsNullOrEmpty(key) ? null
-        : c.PagesFor(deviceId).Where(p => p.Enabled).SelectMany(p => (p.Widgets ?? []).SelectMany(w =>
-                new[] { (Key: p.Id + "/" + w.Id, W: w) }.Concat(StackWidgets.Children(w).Where(ch => ch.Enabled)
-                    .Select(ch => (Key: p.Id + "/" + w.Id + ":" + ch.Id, W: new WidgetConfig { Id = ch.Id, Type = ch.Type, Options = ch.Options })))))
-            .FirstOrDefault(x => x.W.Type == "app-console" && x.Key == key).W;
+    public static WidgetConfig? WidgetFor(AgentConfig c, string? deviceId, string? key) => PanelWidgets.Find(c, deviceId, key, "app-console");
 
     /// <summary>What the phone may know: the matching profile's id, label and key labels. Never the process name or title.</summary>
     public (int Status, object Body) State(string? deviceId, string? widget)
@@ -114,6 +110,8 @@ public sealed class AppConsole(ConfigStore config, ILogger<AppConsole> log)
         List<List<string>> combos;
         try { combos = KeySender.Parse(spec); }
         catch (ArgumentException ex) { return (400, ex.Message); }
+        // also for a binding saved before the limit, or written into the file by hand
+        if (combos.Count > MaxCombos) return (400, $"more than {MaxCombos} key presses; shorten this binding in the app console settings");
         times = slot is "dial-left" or "dial-right" ? Math.Clamp(times, 1, 5) : 1;
 
         if (!await _sending.WaitAsync(TimeSpan.FromSeconds(2), ct)) return (429, "still sending the previous keys");
@@ -143,7 +141,8 @@ public sealed class AppConsole(ConfigStore config, ILogger<AppConsole> log)
         finally { _sending.Release(); }
     }
 
-    internal const int MaxApps = 300, MaxSpec = 200, MaxProfiles = 30;
+    // MaxCombos: 20 presses x 5 dial clicks x 40 ms plus the 2 s queue wait stay well inside the phone's 20 s deadline
+    internal const int MaxApps = 300, MaxSpec = 200, MaxProfiles = 30, MaxCombos = 20;
 
     /// <summary>Checks a profile's key specs; null when they are all valid.</summary>
     public static string? Validate(ConsoleProfile p)
@@ -156,7 +155,7 @@ public sealed class AppConsole(ConfigStore config, ILogger<AppConsole> log)
         {
             if (spec is null) continue;
             if (spec.Length > MaxSpec) return $"App console profile '{p.Label}', {what}: longer than {MaxSpec} characters";
-            try { KeySender.Parse(spec); }
+            try { if (KeySender.Parse(spec).Count > MaxCombos) return $"App console profile '{p.Label}', {what}: more than {MaxCombos} key presses"; }
             catch (ArgumentException ex) { return $"App console profile '{p.Label}', {what}: {ex.Message}"; }
         }
         return null;
@@ -171,7 +170,7 @@ public sealed class AppConsole(ConfigStore config, ILogger<AppConsole> log)
 #endif
     }
 
-    private static FocusedApp? FocusedNow()
+    internal static FocusedApp? FocusedNow()
     {
 #if WINDOWS
         var hwnd = GetForegroundWindow();

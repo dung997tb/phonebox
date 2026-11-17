@@ -9,7 +9,8 @@ const STEP_DEG = 24; // one dial click
 
 async function post(path) {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 5000);
+  // longer than the longest action the agent accepts (AppConsole.MaxCombos): an aborted request would cut a macro short
+  const timer = setTimeout(() => ctl.abort(), 20_000);
   try {
     const r = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: PANEL_HEADERS, signal: ctl.signal });
     if (r.ok) return;
